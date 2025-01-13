@@ -7,6 +7,7 @@ namespace PdfEmbedding.Services
 {
     public class PdfProcessingService
     {
+        // Extract text from a PDF file
         public string ExtractTextFromPdf(string filePath)
         {
             StringBuilder text = new StringBuilder();
@@ -29,11 +30,10 @@ namespace PdfEmbedding.Services
             return text.ToString();
         }
 
-        // Split the extracted text into smaller chunks (for example, 500 characters per chunk)
-        public List<string> ChunkText(string text)
+        // Split the extracted text into smaller chunks (500 characters per chunk)
+        public List<string> ChunkText(string text, int chunkSize = 500)
         {
             List<string> chunks = new List<string>();
-            int chunkSize = 500; // Adjust this value based on your needs
             int totalLength = text.Length;
 
             for (int i = 0; i < totalLength; i += chunkSize)
@@ -44,5 +44,6 @@ namespace PdfEmbedding.Services
 
             return chunks;
         }
+
     }
 }
