@@ -1,45 +1,4 @@
-﻿/*using Newtonsoft.Json;
-
-namespace PdfEmbedding.Services
-{
-    public class StorageService
-    {
-        private readonly string _storagePath;
-
-        public StorageService(string storagePath)
-        {
-            _storagePath = storagePath;
-            if (!Directory.Exists(_storagePath))
-            {
-                Directory.CreateDirectory(_storagePath);
-            }
-        }
-
-        public void SaveVectors(string fileName, List<List<float>> vectors)
-        {
-            var filePath = Path.Combine(_storagePath, fileName);
-            var json = JsonConvert.SerializeObject(vectors);
-            File.WriteAllText(filePath, json);
-        }
-
-        public List<List<float>> LoadVectors(string fileName)
-        {
-            var filePath = Path.Combine(_storagePath, fileName);
-            if (File.Exists(filePath))
-            {
-                var json = File.ReadAllText(filePath);
-                return JsonConvert.DeserializeObject<List<List<float>>>(json)!;
-            }
-            return new List<List<float>>();
-        }
-    }
-}
-*/
-
-
-
-
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.IO;
 
@@ -58,24 +17,28 @@ namespace PdfEmbedding.Services
             }
         }
 
-        // Save only embeddings (vectors) to a JSON file
-        public void SaveVectors(string fileName, List<List<float>> vectors)
+        // Save text chunks and embeddings to a JSON file
+        public void SaveVectors(string fileName, List<string> chunks, List<List<float>> vectors)
         {
+            var data = new { Chunks = chunks, Embeddings = vectors };
             var filePath = Path.Combine(_storagePath, fileName);
-            var json = JsonConvert.SerializeObject(vectors);
+            var json = JsonConvert.SerializeObject(data);
             File.WriteAllText(filePath, json);
         }
 
-        // Load only embeddings (vectors) from a file
-        public List<List<float>> LoadVectors(string fileName)
+        // Load text chunks and embeddings from a file
+        public (List<string> Chunks, List<List<float>> Embeddings) LoadVectors(string fileName)
         {
             var filePath = Path.Combine(_storagePath, fileName);
             if (File.Exists(filePath))
             {
                 var json = File.ReadAllText(filePath);
-                return JsonConvert.DeserializeObject<List<List<float>>>(json)!;
+                var data = JsonConvert.DeserializeObject<dynamic>(json);
+                var chunks = data.Chunks.ToObject<List<string>>();
+                var embeddings = data.Embeddings.ToObject<List<List<float>>>();
+                return (chunks, embeddings);
             }
-            return new List<List<float>>();
+            return (new List<string>(), new List<List<float>>());
         }
     }
 }

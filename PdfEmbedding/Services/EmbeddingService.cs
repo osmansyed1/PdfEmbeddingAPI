@@ -10,7 +10,7 @@ namespace PdfEmbedding.Services
 
         public EmbeddingService(string apiKey)
         {
-            _embeddingClient = new EmbeddingClient("text-embedding-3-small", apiKey);
+            _embeddingClient = new EmbeddingClient("text-embedding-ada-002", apiKey);
         }
 
         // Generate embeddings for each chunk of text

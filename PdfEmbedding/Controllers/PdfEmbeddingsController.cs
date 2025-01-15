@@ -1,6 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PdfEmbedding.Models;
 using PdfEmbedding.Services;
+using System.Linq;
+using System.Threading.Tasks;
+using System.IO;
 
 [Route("api/[controller]")]
 [ApiController]
@@ -41,14 +44,14 @@ public class PdfEmbeddingsController : ControllerBase
         // Extract text from the uploaded PDF
         var text = _pdfProcessingService.ExtractTextFromPdf(filePath);
 
-        // Dynamically chunk the text based on the size of the content
+        // Dynamically chunk the text based on the size of the content (500 characters per chunk)
         var chunks = _pdfProcessingService.ChunkText(text, 500); // 500 characters per chunk
 
         // Generate embeddings for each chunk
         var embeddings = await _embeddingService.GenerateEmbeddingsAsync(chunks);
 
-        // Save the embeddings to storage (in Vectors folder)
-        _storageService.SaveVectors(file.FileName + ".json", embeddings);
+        // Save the embeddings and chunks to storage
+        _storageService.SaveVectors(file.FileName + ".json", chunks, embeddings);
 
         return Ok("File uploaded and processed successfully.");
     }
@@ -62,25 +65,26 @@ public class PdfEmbeddingsController : ControllerBase
 
         try
         {
-            // 1. Load embeddings stored on disk (each chunk will have its own embedding)
-            var embeddings = _storageService.LoadVectors(request.FileName);
+            // Load embeddings and chunks stored on disk
+            var (chunks, embeddings) = _storageService.LoadVectors(request.FileName);
 
             if (!embeddings.Any())
                 return BadRequest("No embeddings available to search");
 
-            // 2. Generate embedding for the question
+            // Generate embedding for the question
             var queryEmbedding = await _embeddingService.GenerateQueryEmbeddingAsync(request.Question);
 
-            // 3. Find the top matching embeddings based on cosine similarity (you can change the number of top matches)
-            var topMatches = FindTopMatches(queryEmbedding, embeddings, 3); // Adjust "3" to get more matches
+            // Find the top matching embeddings using cosine similarity
+            int topK = 3; // Top-K number of matches to retrieve
+            var topMatches = FindTopMatches(queryEmbedding, embeddings, topK);
 
-            // 4. Generate an answer based on the top matching chunks (context) using LLM (OpenAI)
-            var context = string.Join("\n", topMatches.Select(match => $"Chunk {match.Index + 1}: {embeddings[match.Index]}"));
+            // Create the context from the top matching chunks
+            var context = string.Join("\n", topMatches.Select(match => $"Chunk {match.Index + 1}: {chunks[match.Index]}"));
 
-            // Here you may provide the "context" from the top chunks to the OpenAI model
+            // Generate an answer using OpenAI based on the context
             var generatedAnswer = await _openAIService.GenerateAnswer(request.Question, context);
 
-            // 5. Return the generated answer along with the similarity score (optional)
+            // Return the generated answer along with the similarity score (optional)
             return Ok(new
             {
                 answer = generatedAnswer,
@@ -94,21 +98,16 @@ public class PdfEmbeddingsController : ControllerBase
     }
 
     // Find the top matching embeddings using cosine similarity
-    private List<(int Index, float Similarity)> FindTopMatches(
-        List<float> queryEmbedding,
-        List<List<float>> embeddings,
-        int topK)
+    private List<(int Index, float Similarity)> FindTopMatches(List<float> queryEmbedding, List<List<float>> embeddings, int topK)
     {
         var similarities = new List<(int Index, float Similarity)>();
 
-        // Calculate cosine similarity for each embedding
         for (int i = 0; i < embeddings.Count; i++)
         {
             float similarity = CalculateCosineSimilarity(queryEmbedding, embeddings[i]);
             similarities.Add((i, similarity));
         }
 
-        // Return the top K most similar matches
         return similarities
             .OrderByDescending(x => x.Similarity)
             .Take(topK)
@@ -122,7 +121,6 @@ public class PdfEmbeddingsController : ControllerBase
         float magnitude1 = 0;
         float magnitude2 = 0;
 
-        // Calculate dot product and magnitudes
         for (int i = 0; i < vector1.Count; i++)
         {
             dotProduct += vector1[i] * vector2[i];
