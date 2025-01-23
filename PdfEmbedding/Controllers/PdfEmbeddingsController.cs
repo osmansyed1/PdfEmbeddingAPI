@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PdfEmbedding.Models;
 using PdfEmbedding.Services;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using System.IO;
 using System;
 
 namespace PdfEmbedding.Controllers
@@ -58,49 +58,7 @@ namespace PdfEmbedding.Controllers
             // Append the embeddings and chunks to the vector database (vector_db.json)
             _storageService.SaveVectors("vector_db.json", chunks, embeddings);
 
-            return Ok("File uploaded and processed successfully.");
-        }
-
-        // Ask a question, find matching embeddings, and generate an answer
-        [HttpPost("ask-question")]
-        public async Task<IActionResult> AskQuestion([FromBody] QuestionRequest request)
-        {
-            if (string.IsNullOrEmpty(request.Question))
-                return BadRequest("Question cannot be empty");
-
-            try
-            {
-                // Load all embeddings and chunks stored in the vector database (vector_db.json)
-                var (chunks, embeddings) = _storageService.LoadVectors("vector_db.json");
-
-                if (!embeddings.Any())
-                    return BadRequest("No embeddings available to search");
-
-                // Generate embedding for the question
-                var queryEmbedding = await _embeddingService.GenerateQueryEmbeddingAsync(request.Question);
-
-                // Find the top matching embeddings using cosine similarity
-                int topK = 3; // Top-K number of matches to retrieve
-                var topMatches = FindTopMatches(queryEmbedding, embeddings, topK);
-
-                // Create the context from the top matching chunks
-                var context = string.Join("\n", topMatches.Select(match =>
-                    $"Chunk {match.Index + 1} (Similarity: {Math.Round(match.Similarity, 4)}): {chunks[match.Index]}"));
-
-                // Generate an answer using OpenAI based on the context
-                var generatedAnswer = await _openAIService.GenerateAnswer(request.Question, context);
-
-                // Return the generated answer along with the similarity score (optional)
-                return Ok(new
-                {
-                    answer = generatedAnswer,
-                    confidence = Math.Round(topMatches.First().Similarity, 4),
-                });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Error processing question: {ex.Message}");
-            }
+            return Ok("PDF file uploaded and processed successfully.");
         }
 
         // Upload DOCX, extract text, generate embeddings, and append to the existing vector DB
@@ -128,12 +86,12 @@ namespace PdfEmbedding.Controllers
             // Append the embeddings and chunks to the vector database (vector_db.json)
             _storageService.SaveVectors("vector_db.json", chunks, embeddings);
 
-            return Ok("File uploaded and processed successfully.");
+            return Ok("DOCX file uploaded and processed successfully.");
         }
 
-        // Ask a question, find matching embeddings, and generate an answer based on DOCX content
-        [HttpPost("ask-question-docx")]
-        public async Task<IActionResult> AskQuestionForDocx([FromBody] QuestionRequest request)
+        // Ask a question and get an answer from the stored embeddings
+        [HttpPost("ask-question")]
+        public async Task<IActionResult> AskQuestion([FromBody] QuestionRequest request)
         {
             if (string.IsNullOrEmpty(request.Question))
                 return BadRequest("Question cannot be empty");

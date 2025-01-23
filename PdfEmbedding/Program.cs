@@ -49,7 +49,7 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
-var vectorsPath = app.Configuration["Storage:Path"] ?? "Vectors";
+var vectorsPath = app.Configuration["Storage:Path"] ?? "Vectors";   
 if (!Directory.Exists(vectorsPath))
 {
     Directory.CreateDirectory(vectorsPath);
